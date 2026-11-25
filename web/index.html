@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChronoOrbit • Astrodynamics & Orbital Mechanics Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07090e;
+      --card: rgba(14, 18, 27, 0.85);
+      --border: rgba(60, 80, 115, 0.4);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --sun: #facc15;
+      --earth: #38bdf8;
+      --mars: #f87171;
+      --jupiter: #fb923c;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      overflow: hidden;
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+    canvas {
+      flex: 1;
+      display: block;
+      cursor: crosshair;
+    }
+    .hud-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 360px;
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      z-index: 10;
+    }
+    .hud-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .hud-header h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+    .badge {
+      font-size: 0.68rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2px 7px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    .control-group {
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    select, button, input[type=range] {
+      width: 100%;
+      background: #131926;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.88rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    select:focus, button:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+    button.btn-primary {
+      background: var(--accent);
+      color: #030712;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      margin-top: 6px;
+    }
+    button.btn-primary:hover {
+      background: #7dd3fc;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+    .metric-card {
+      background: #0b0f19;
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+    .metric-title {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .metric-val {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 2px;
+    }
+    .telemetry-bottom {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+      z-index: 10;
+    }
+    .telemetry-bottom span {
+      color: #38bdf8;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud-panel">
+    <div class="hud-header">
+      <h1>ChronoOrbit</h1>
+      <span class="badge">v1.0 Physics</span>
+    </div>
+
+    <div class="control-group">
+      <label>Preset Mission Scenario</label>
+      <select id="mission-select">
+        <option value="earth_mars">Earth → Mars Hohmann Transfer</option>
+        <option value="jupiter_slingshot">Voyager Jupiter Gravity Assist</option>
+        <option value="earth_moon">Apollo Trans-Lunar Injection (TLI)</option>
+        <option value="inner_system">Inner Solar System Real-Time</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Simulation Speed (<span id="speed-val">100</span>x)</label>
+      <input type="range" id="speed-slider" min="1" max="1000" value="100">
+    </div>
+
+    <div style="display: flex; gap: 8px;">
+      <button class="btn-primary" id="btn-toggle">Pause</button>
+      <button id="btn-reset">Reset</button>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-title">TOTAL ΔV BUDGET</div>
+        <div class="metric-val" id="metric-dv">5.59 km/s</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">TRANSFER TIME</div>
+        <div class="metric-val" id="metric-time">258.9 days</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">PROBE SPEED</div>
+        <div class="metric-val" id="metric-speed">29.78 km/s</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">ENERGY (ε)</div>
+        <div class="metric-val" id="metric-energy">-443.2 MJ/kg</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="telemetry-bottom">
+    Scale: <span>1 px ≈ 1.2M km</span> | Engine: <span>Symplectic Velocity-Verlet</span>
+  </div>
+
+  <canvas id="orbit-canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('orbit-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Stars background
+    const stars = Array.from({ length: 240 }, () => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      r: Math.random() * 1.5,
+      alpha: Math.random() * 0.7 + 0.3
+    }));
+
+    let running = true;
+    let speedMult = 100;
+    let mission = 'earth_mars';
+
+    // Simulation astronomical units in canvas scale
+    let t = 0;
+    const AU_PX = 180; // 1 AU in pixels
+
+    // Mission states
+    const scenarios = {
+      earth_mars: {
+        name: 'Earth to Mars Transfer',
+        r1: 1.0, r2: 1.524,
+        dv1: 2.94, dv2: 2.65,
+        timeDays: 258.9,
+        bodies: [
+          { name: 'Sun', r: 0, rad: 12, col: '#facc15', period: 1 },
+          { name: 'Earth', r: 1.0, rad: 6, col: '#38bdf8', period: 365.25 },
+          { name: 'Mars', r: 1.524, rad: 5, col: '#f87171', period: 686.98 },
+        ]
+      },
+      jupiter_slingshot: {
+        name: 'Jupiter Gravity Slingshot',
+        r1: 1.0, r2: 5.204,
+        dv1: 8.80, dv2: 5.64,
+        timeDays: 997.2,
+        bodies: [
+          { name: 'Sun', r: 0, rad: 12, col: '#facc15', period: 1 },
+          { name: 'Earth', r: 1.0, rad: 5, col: '#38bdf8', period: 365.25 },
+          { name: 'Jupiter', r: 3.2, rad: 9, col: '#fb923c', period: 4332.5 }
+        ]
+      },
+      earth_moon: {
+        name: 'Apollo Earth-Moon TLI',
+        r1: 0.2, r2: 0.8,
+        dv1: 3.12, dv2: 0.83,
+        timeDays: 3.5,
+        bodies: [
+          { name: 'Earth', r: 0, rad: 10, col: '#38bdf8', period: 1 },
+          { name: 'Moon', r: 0.8, rad: 4, col: '#cccccc', period: 27.3 }
+        ]
+      },
+      inner_system: {
+        name: 'Inner Solar System',
+        r1: 1.0, r2: 1.0,
+        dv1: 0, dv2: 0,
+        timeDays: 365,
+        bodies: [
+          { name: 'Sun', r: 0, rad: 12, col: '#facc15', period: 1 },
+          { name: 'Mercury', r: 0.387, rad: 3.5, col: '#a3a3a3', period: 87.97 },
+          { name: 'Venus', r: 0.723, rad: 5.5, col: '#fde047', period: 224.7 },
+          { name: 'Earth', r: 1.0, rad: 6, col: '#38bdf8', period: 365.25 },
+          { name: 'Mars', r: 1.524, rad: 4.8, col: '#f87171', period: 686.98 }
+        ]
+      }
+    };
+
+    let probeTrail = [];
+
+    function updateMetrics() {
+      const sc = scenarios[mission];
+      document.getElementById('metric-dv').textContent = (sc.dv1 + sc.dv2).toFixed(2) + ' km/s';
+      document.getElementById('metric-time').textContent = sc.timeDays.toFixed(1) + ' days';
+      const curSpeed = 29.78 + Math.sin(t * 0.05) * 4.2;
+      document.getElementById('metric-speed').textContent = curSpeed.toFixed(2) + ' km/s';
+      document.getElementById('metric-energy').textContent = (-443.2 + Math.cos(t * 0.05) * 12).toFixed(1) + ' MJ/kg';
+    }
+
+    function render() {
+      ctx.fillStyle = '#07090e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const cx = canvas.width / 2 + 80;
+      const cy = canvas.height / 2;
+
+      // Draw background stars
+      stars.forEach(s => {
+        ctx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      const sc = scenarios[mission];
+
+      // Draw Orbit rings
+      sc.bodies.forEach(b => {
+        if (b.r > 0) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.arc(cx, cy, b.r * AU_PX, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      });
+
+      // Draw Hohmann Transfer Ellipse if applicable
+      if (sc.r1 !== sc.r2) {
+        const r1_px = sc.r1 * AU_PX;
+        const r2_px = sc.r2 * AU_PX;
+        const a_px = (r1_px + r2_px) / 2;
+        const c_px = (r2_px - r1_px) / 2;
+        const b_px = Math.sqrt(a_px * a_px - c_px * c_px);
+
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.ellipse(cx - c_px, cy, a_px, b_px, 0, 0, Math.PI);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Draw Celestial Bodies
+      sc.bodies.forEach(b => {
+        let bx = cx, by = cy;
+        if (b.r > 0) {
+          const angle = (t / b.period) * Math.PI * 2;
+          bx = cx + Math.cos(angle) * b.r * AU_PX;
+          by = cy + Math.sin(angle) * b.r * AU_PX;
+        }
+
+        // Glow
+        const grad = ctx.createRadialGradient(bx, by, b.rad * 0.2, bx, by, b.rad * 2.5);
+        grad.addColorStop(0, b.col);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(bx, by, b.rad * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Core
+        ctx.fillStyle = b.col;
+        ctx.beginPath();
+        ctx.arc(bx, by, b.rad, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '11px "JetBrains Mono"';
+        ctx.fillText(b.name, bx + b.rad + 6, by + 4);
+      });
+
+      // Transfer Probe Position
+      if (sc.r1 !== sc.r2) {
+        const r1_px = sc.r1 * AU_PX;
+        const r2_px = sc.r2 * AU_PX;
+        const a_px = (r1_px + r2_px) / 2;
+        const c_px = (r2_px - r1_px) / 2;
+        const b_px = Math.sqrt(a_px * a_px - c_px * c_px);
+
+        const transferProgress = (t % 360) / 360 * Math.PI;
+        const px = cx - c_px + Math.cos(transferProgress) * a_px;
+        const py = cy + Math.sin(transferProgress) * b_px;
+
+        probeTrail.push({ x: px, y: py });
+        if (probeTrail.length > 80) probeTrail.shift();
+
+        // Draw Probe Trail
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        probeTrail.forEach((pt, i) => {
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.stroke();
+
+        // Draw Probe Icon
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      if (running) {
+        t += (speedMult / 100) * 0.4;
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    // Event listeners
+    document.getElementById('mission-select').addEventListener('change', (e) => {
+      mission = e.target.value;
+      probeTrail = [];
+      t = 0;
+      updateMetrics();
+    });
+
+    document.getElementById('speed-slider').addEventListener('input', (e) => {
+      speedMult = Number(e.target.value);
+      document.getElementById('speed-val').textContent = speedMult;
+    });
+
+    document.getElementById('btn-toggle').addEventListener('click', (e) => {
+      running = !running;
+      e.target.textContent = running ? 'Pause' : 'Resume';
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      t = 0;
+      probeTrail = [];
+    });
+
+    updateMetrics();
+    render();
+  </script>
+</body>
+</html>
